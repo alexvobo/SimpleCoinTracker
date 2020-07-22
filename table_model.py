@@ -1,6 +1,4 @@
-import sys
-from PySide2 import QtCore, QtGui, QtWidgets
-from PySide2.QtCore import Qt, QModelIndex
+from PySide2 import QtCore
 import pandas as pd
 
 
@@ -11,7 +9,6 @@ class TableModel(QtCore.QAbstractTableModel):
         pd.set_option('display.precision', 8)
         pd.set_option('display.float_format', lambda x: '%.8f' % x)
         self.table_data = data
-
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
         if index.isValid():
@@ -30,11 +27,3 @@ class TableModel(QtCore.QAbstractTableModel):
         if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
             return self.table_data.columns[col]
         return None
-
-    # def insertRows(self, dfs, row, count=1, index=QModelIndex()):
-    #
-    #     self.beginInsertRows(index, row, row + count - 1)
-    #
-    #     self.table_data.append(dfs, ignore_index=True)
-    #     self.endInsertRows()
-    #     return True

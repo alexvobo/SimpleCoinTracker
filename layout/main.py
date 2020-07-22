@@ -13,14 +13,16 @@ from table_model import TableModel
 # region Misc. settings
 ''' Set portfolio path'''
 portfolio_path = "../portfolio.json"
+
 ''' Set API fetch interval'''
 timer_interval = 5000
+
 ''' Set precision for prices'''
 pd.set_option('display.precision', 8)
 pd.options.display.float_format = '{:.8f}'.format
 # endregion
 
-# region portfolio IO [Load/Save]
+# region Portfolio IO [Load/Save]
 '''load portfolio file, returns pandas dataframe  '''
 
 
@@ -37,11 +39,6 @@ def save_portfolio(data):
         json.dump(data, f)
 
 
-''' coin_data  = Dataframe. Our portfolio that we pull from the file. 
-    portfolio_coins =  list of symbols in the portfolio.
- '''
-coin_data = load_portfolio()
-portfolio_coins = coin_data['symbol'].tolist()
 # endregion
 
 
@@ -74,6 +71,7 @@ def calculatePL(entry, current):
 
 
 # endregion
+
 # region Threading Stuff
 class WorkerSignals(QObject):
     '''
@@ -146,6 +144,7 @@ class Worker(QRunnable):
 
 
 # endregion
+
 class MainWindow(QMainWindow):
 
     def __init__(self, *args, **kwargs):
@@ -159,7 +158,7 @@ class MainWindow(QMainWindow):
         # region Populate table
 
         '''Create model, pass data (has to be pandas dataframe)'''
-        self.model = TableModel(coin_data)
+        self.model = TableModel(load_portfolio())
         '''Set the model for table '''
         self.table.setModel(self.model)
         '''Set some table properties'''
@@ -180,57 +179,30 @@ class MainWindow(QMainWindow):
         self.timer.start()
         # endregion info
 
-    # region table stuff [IGNORE]
+    # region Load Main UI/Widget Assignment/Save
+    def load_ui(self):
+        ''' loads ui file '''
+        loader = QUiLoader()
+        path = "form.ui"
+        ui_file = QFile(path)
+        ui_file.open(QFile.ReadOnly)
+        self.w = loader.load(ui_file, self)
+        self.w.show()
+        self.w.setWindowTitle("Coin Tracker v1.0")
+        ui_file.close()
 
-    # def table_insertInto(self, item_to_add):
-    #     self.timer.stop()
-    #
-    #     # Add row to table.
-    #     row_index = self.table.rowCount()
-    #     self.table.insertRow(self.table.rowCount())
-    #     # Insert data into table
-    #     for col_i, item in enumerate(item_to_add):
-    #         newItem = QTableWidgetItem(str(item))
-    #         self.table.setItem(row_index, col_i, newItem)
-    #
-    #     self.timer.start()
-    #
-    # def table_deleteFrom(self, item):
-    #     global coin_data
-    #     # Using indexes, locate what rows we need to remove from table
-    #     item = item[0]
-    #     self.timer.stop()
-    #     coin_data = coin_data[(coin_data['symbol'] != item.text())]
-    #     print(coin_data.head())
-    #     self.table.removeRow(item.row())
-    #     self.timer.start()
-    #     # Find the coins we need to remove from our data
+    def assign_widgets(self):
+        self.table = self.w.table
+        self.w.save.clicked.connect(self.save)
+        self.w.remove.clicked.connect(self.remove_rows)
+        self.w.add.clicked.connect(self.add_row)
 
-    # def table_setData(self):
-    #     global coin_data
-    #     self.table.setRowCount(coin_data.shape[0])
-    #     self.table.setColumnCount(coin_data.shape[1])
-    #
-    #     horHeaders = list(coin_data.columns)
-    #     for row_i, row in coin_data.iterrows():
-    #         for col_j, item in enumerate(list(row)):
-    #             newitem = QTableWidgetItem(str(item))
-    #             self.table.setItem(row_i, col_j, newitem)
-    #
-    #     self.table.setHorizontalHeaderLabels(horHeaders)
-
-    # def table_updateData(self):
-    #     self.table.repaint()
-    #
-    #     # coin = {"symbol": coinname.upper(),
-    #     #                "exchange": exchange,
-    #     #                "entry": float(price),
-    #     #                "price": 0.0,
-    #     #                "P/L": 0.0
-    #     #                }
+    def save(self):
+        save_portfolio(self.model.table_data.to_dict(orient='records'))
 
     # endregion
-    # region Table Manipulation
+
+    # region Table Manipulation [Remove Row/Add Dialog]
     def remove_rows(self):
         indexes = self.table.selectedIndexes()
         if indexes:
@@ -268,11 +240,8 @@ class MainWindow(QMainWindow):
         ui_file.close()
 
     # endregion
-    # region dialog
+    # region Dialog [Add Coin/Close]
     def dialog_add_button(self):
-        global coin_data
-        min_coin_name_len = 5
-        ''' validate data '''
         coinname = self.dialog.coin_name.text()
         price = self.dialog.entry_price.text()
         exchange = self.dialog.exchange_select.currentText()
@@ -285,16 +254,12 @@ class MainWindow(QMainWindow):
                            "price": [0.0],
                            "P/L": [0.0]
                            }
-            # self.model.insertRow(self.model.rowCount())
 
-            # coin_data = coin_data.append(coin_to_add, ignore_index=True)
-            # self.table_insertInto(coin_to_add.values())
             data = pd.DataFrame.from_dict(coin_to_add)
             self.model.table_data = self.model.table_data.append(data, ignore_index=True, sort=False)
             self.model.layoutChanged.emit()
-            print(self.model.table_data.head())
-            # self.model.insertRows(coin_to_add, self.model.rowCount())
-            # self.save()
+            # print(self.model.table_data.head())
+
             self.close_dialog()
         else:
             self.dialog.coin_name.setPlaceholderText("Please enter coin name")
@@ -310,25 +275,6 @@ class MainWindow(QMainWindow):
     # def progress_fn(self, data):
     #     print(data)
     # endregion
-    def load_ui(self):
-        ''' loads ui file '''
-        loader = QUiLoader()
-        path = "form.ui"
-        ui_file = QFile(path)
-        ui_file.open(QFile.ReadOnly)
-        self.w = loader.load(ui_file, self)
-        self.w.show()
-        self.w.setWindowTitle("Coin Tracker v1.0")
-        ui_file.close()
-
-    def assign_widgets(self):
-        self.table = self.w.table
-        self.w.save.clicked.connect(self.save)
-        self.w.remove.clicked.connect(self.remove_rows)
-        self.w.add.clicked.connect(self.add_row)
-
-    def save(self):
-        save_portfolio(self.model.table_data.to_dict(orient='records'))
 
     # region Executing Functions
     # def fetch_price(self, progress_callback):
@@ -336,49 +282,37 @@ class MainWindow(QMainWindow):
     # progress_callback.emit(data)
 
     def fetch_price(self, progress_callback):
-        #print("executing")
+        # print("executing")
         return requests.get(url=binance_api).content
 
-    # endregion
-
     def handle_output(self, d):
-        global binance_coins, kucoin_coins, coin_data
+        global binance_coins, kucoin_coins
 
         ''' Filters our data from fetch_price to exclude coins we dont have in the list.  '''
         new_data = pd.read_json(d)
         if len(binance_coins) == 0:
             binance_coins = new_data['symbol'].tolist()
         if len(kucoin_coins) == 0:
+            '''TODO: ADD KUCOIN SUPPORT'''
             kucoin_coins = ["DRGNBTC"]
 
         cleaned = new_data[new_data['symbol'].isin(self.model.table_data['symbol'].tolist())].reset_index(drop=True)
-        # print(cleaned.head())
-        # print(coin_data.head())
-        # print(self.model.table_data.head())
+
         for coin in self.model.table_data['symbol'].tolist():
             newprice = cleaned.loc[cleaned['symbol'] == coin]['price'].item()
             self.model.table_data.loc[self.model.table_data['symbol'] == coin, 'price'] = newprice
 
-        # print(self.model.table_data.head())
-        # self.model.table_data.update(cleaned)
-        # print(self.model.table_data.head())
-        # print(coin_data.head())
-        self.model.table_data['entry'] = self.model.table_data['entry'].apply(lambda x: '%.8f' % float(x))
-        self.model.table_data['price'] = self.model.table_data['price'].apply(lambda x: '%.8f' % float(x))
-
-        self.model.table_data['entry'] = self.model.table_data['entry'].astype(str)
-        self.model.table_data['price'] = self.model.table_data['price'].astype(str)
+        self.model.table_data['entry'] = self.model.table_data['entry'].apply(lambda x: '%.8f' % float(x)).astype(str)
+        self.model.table_data['price'] = self.model.table_data['price'].apply(lambda x: '%.8f' % float(x)).astype(str)
         self.model.table_data['P/L'] = self.model.table_data.apply(
             lambda x: str(calculatePL(float(x['entry']), float(x['price']))) + "%",
             axis=1)
+
         self.model.layoutChanged.emit()
-        # print(coin_data.head())
-        # self.table.repaint()
 
     def thread_complete(self):
-        # On successfully updating coin_data after fetching price, save.
+        """When fetching/updating is complete, save"""
         self.save()
-        pass
 
     def assign_worker_fn(self):
         # Pass the function to execute
@@ -389,8 +323,7 @@ class MainWindow(QMainWindow):
 
         # Execute
         self.threadpool.start(worker)
-        # self.counter += 1
-        # print(self.counter)
+    # endregion
 
 
 if __name__ == "__main__":
