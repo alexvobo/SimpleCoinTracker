@@ -3,7 +3,6 @@ import requests
 import sys
 import traceback
 import pandas as pd
-import colors
 
 from PySide2.QtCore import *
 from PySide2.QtUiTools import QUiLoader
@@ -49,7 +48,7 @@ def save_portfolio(data):
 binance_api = 'https://api.binance.com/api/v3/ticker/price'
 
 '''Kucoin API url'''
-kucoin_api = "https://api.kucoin.com/"
+kucoin_api = "https://api.kucoin.com/api/v1/market/allTickers"
 
 '''Coin List (updated after first pass)'''
 binance_coins = []
@@ -62,6 +61,7 @@ kucoin_coins = []
 
 def calculatePL(entry, current):
     return round(((current - entry) / abs(entry)) * 100, 2)
+
     # if pl > 0:
     #     return colors.prGreen(pl)
     # elif pl < 0:
@@ -283,27 +283,49 @@ class MainWindow(QMainWindow):
 
     def fetch_price(self, progress_callback):
         # print("executing")
-        return requests.get(url=binance_api).content
+        return requests.get(url=binance_api).content, requests.get(url=kucoin_api).json()
 
-    def handle_output(self, d):
+    def handle_output(self, data):
         global binance_coins, kucoin_coins
 
+        (binance_data, kucoin_data) = data
+
         ''' Filters our data from fetch_price to exclude coins we dont have in the list.  '''
-        new_data = pd.read_json(d)
+        binance_new_data = pd.read_json(binance_data)
+
+        kucoin_new_data = pd.DataFrame.from_records(pd.DataFrame(kucoin_data['data'])['ticker'].values)
+        kucoin_new_data['symbol'] = kucoin_new_data['symbol'].apply(lambda x: "".join(x.split("-"))).tolist()
+
         if len(binance_coins) == 0:
-            binance_coins = new_data['symbol'].tolist()
+            binance_coins = binance_new_data['symbol'].tolist()
         if len(kucoin_coins) == 0:
-            '''TODO: ADD KUCOIN SUPPORT'''
-            kucoin_coins = ["DRGNBTC"]
+            kucoin_coins = kucoin_new_data['symbol'].tolist()
 
-        cleaned = new_data[new_data['symbol'].isin(self.model.table_data['symbol'].tolist())].reset_index(drop=True)
+        binance_cleaned = binance_new_data[
+            binance_new_data['symbol'].isin(self.model.table_data['symbol'].tolist())].reset_index(drop=True)
+        kucoin_cleaned = kucoin_new_data[
+            kucoin_new_data['symbol'].isin(self.model.table_data['symbol'].tolist())].reset_index(drop=True)
 
-        for coin in self.model.table_data['symbol'].tolist():
-            newprice = cleaned.loc[cleaned['symbol'] == coin]['price'].item()
+        for row in self.model.table_data.iterrows():
+            coin = row[1]['symbol']
+            exchange = row[1]['exchange']
+            if exchange.lower() == "binance":
+                newprice = binance_cleaned.loc[binance_cleaned['symbol'] == coin]['price'].item()
+            else:
+                newprice = kucoin_cleaned.loc[kucoin_cleaned['symbol'] == coin]['averagePrice'].item()
+
             self.model.table_data.loc[self.model.table_data['symbol'] == coin, 'price'] = newprice
 
-        self.model.table_data['entry'] = self.model.table_data['entry'].apply(lambda x: '%.8f' % float(x)).astype(str)
-        self.model.table_data['price'] = self.model.table_data['price'].apply(lambda x: '%.8f' % float(x)).astype(str)
+        self.model.table_data['entry'] = self.model.table_data.apply(
+            lambda x: '%.2f' % float(x['entry']) if x['symbol'].upper().find("USD") != -1 else '%.8f' % float(
+                x['entry']),
+            axis=1).astype(str)
+        #
+        self.model.table_data['price'] = self.model.table_data.apply(
+            lambda x: '%.2f' % float(x['price']) if x['symbol'].upper().find("USD") != -1 else '%.8f' % float(
+                x['price']),
+            axis=1).astype(str)
+
         self.model.table_data['P/L'] = self.model.table_data.apply(
             lambda x: str(calculatePL(float(x['entry']), float(x['price']))) + "%",
             axis=1)
@@ -323,7 +345,9 @@ class MainWindow(QMainWindow):
 
         # Execute
         self.threadpool.start(worker)
-    # endregion
+
+
+# endregion
 
 
 if __name__ == "__main__":

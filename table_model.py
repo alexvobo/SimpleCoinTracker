@@ -1,4 +1,4 @@
-from PySide2 import QtCore
+from PySide2 import QtCore, QtGui
 import pandas as pd
 
 
@@ -8,6 +8,7 @@ class TableModel(QtCore.QAbstractTableModel):
         QtCore.QAbstractTableModel.__init__(self, parent)
         pd.set_option('display.precision', 8)
         pd.set_option('display.float_format', lambda x: '%.8f' % x)
+
         self.table_data = data
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
@@ -15,6 +16,9 @@ class TableModel(QtCore.QAbstractTableModel):
             if role == QtCore.Qt.DisplayRole:
                 self.dataChanged.emit(index, index)
                 return str(self.table_data.iloc[index.row(), index.column()])
+            elif role == QtGui.Qt.TextAlignmentRole:
+                return int(QtGui.Qt.AlignCenter | QtGui.Qt.AlignVCenter)
+
         return None
 
     def rowCount(self, index):
@@ -25,5 +29,5 @@ class TableModel(QtCore.QAbstractTableModel):
 
     def headerData(self, col, orientation, role):
         if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
-            return self.table_data.columns[col]
+            return self.table_data.columns[col].upper()
         return None
