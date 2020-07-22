@@ -9,9 +9,13 @@ from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import *
 from table_model import TableModel
 
+testing = 1
 # region Misc. settings
 ''' Set portfolio path'''
-portfolio_path = "../portfolio.json"
+if testing == 1:
+    portfolio_path = "../portfolio2.json"
+else:
+    portfolio_path = "../portfolio.json"
 
 ''' Set API fetch interval'''
 timer_interval = 5000
@@ -70,6 +74,11 @@ def calculatePL(entry, current):
     #     return colors.prWhite(pl)
 
 
+def calculatePLSats(entry, current, amt):
+
+    return round((amt * current) - (amt * entry), 5)
+
+
 # endregion
 
 # region Threading Stuff
@@ -89,7 +98,7 @@ class WorkerSignals(QObject):
         `object` data returned from processing, anything
 
     progress
-        `int` indicating % progress 
+        `int` indicating % progress
 
     '''
     finished = Signal()
@@ -104,7 +113,7 @@ class Worker(QRunnable):
 
     Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
 
-    :param callback: The function callback to run on this worker thread. Supplied args and 
+    :param callback: The function callback to run on this worker thread. Supplied args and
                      kwargs will be passed through to the runner.
     :type callback: function
     :param args: Arguments to pass to the callback function
@@ -245,6 +254,7 @@ class MainWindow(QMainWindow):
         coinname = self.dialog.coin_name.text()
         price = self.dialog.entry_price.text()
         exchange = self.dialog.exchange_select.currentText()
+        amount = self.dialog.amount.currentText()
 
         if len(coinname) > 0 and float(price) > 0:
             ''' add field data to coindata df  '''
@@ -252,7 +262,9 @@ class MainWindow(QMainWindow):
                            "exchange": [exchange],
                            "entry": [float(price)],
                            "price": [0.0],
-                           "P/L": [0.0]
+                           "P/L %": [0.0],
+                           "P/L": [0.0],
+                           "amount": [0.0]
                            }
 
             data = pd.DataFrame.from_dict(coin_to_add)
@@ -326,8 +338,12 @@ class MainWindow(QMainWindow):
                 x['price']),
             axis=1).astype(str)
 
-        self.model.table_data['P/L'] = self.model.table_data.apply(
+        self.model.table_data['P/L %'] = self.model.table_data.apply(
             lambda x: str(calculatePL(float(x['entry']), float(x['price']))) + "%",
+            axis=1)
+
+        self.model.table_data['P/L'] = self.model.table_data.apply(
+            lambda x: str(calculatePLSats(float(x['entry']), float(x['price']), float(x['amount'])))+" ₿",
             axis=1)
 
         self.model.layoutChanged.emit()
