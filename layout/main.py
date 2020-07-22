@@ -7,9 +7,11 @@ import pandas as pd
 from PySide2.QtCore import *
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import *
+from PySide2.QtGui import *
 from table_model import TableModel
 
 testing = 1
+version = "1.1"
 # region Misc. settings
 ''' Set portfolio path'''
 if testing == 1:
@@ -75,7 +77,6 @@ def calculatePL(entry, current):
 
 
 def calculatePLSats(entry, current, amt):
-
     return round((amt * current) - (amt * entry), 5)
 
 
@@ -197,12 +198,11 @@ class MainWindow(QMainWindow):
         ui_file.open(QFile.ReadOnly)
         self.w = loader.load(ui_file, self)
         self.w.show()
-        self.w.setWindowTitle("Coin Tracker v1.0")
+        self.w.setWindowTitle("Coin Tracker " + version)
         ui_file.close()
 
     def assign_widgets(self):
         self.table = self.w.table
-        self.w.save.clicked.connect(self.save)
         self.w.remove.clicked.connect(self.remove_rows)
         self.w.add.clicked.connect(self.add_row)
 
@@ -343,8 +343,18 @@ class MainWindow(QMainWindow):
             axis=1)
 
         self.model.table_data['P/L'] = self.model.table_data.apply(
-            lambda x: str(calculatePLSats(float(x['entry']), float(x['price']), float(x['amount'])))+" ₿",
+            lambda x: str(calculatePLSats(float(x['entry']), float(x['price']), float(x['amount']))) + " ₿",
             axis=1)
+
+        moneymoney = self.model.table_data['P/L'].apply(lambda x: float(x.split(" ")[0])).sum()
+        palette = self.w.lcdNumber.palette()
+        if moneymoney > 0:
+            palette.setColor(palette.WindowText, QColor(0,128,0))
+        elif moneymoney < 0:
+            palette.setColor(palette.WindowText, QColor(255,0,0))
+
+        self.w.lcdNumber.setPalette(palette)
+        self.w.lcdNumber.display(moneymoney)
 
         self.model.layoutChanged.emit()
 
